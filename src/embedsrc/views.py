@@ -144,10 +144,10 @@ def generate_image(filename, code, callouts):
         text=retval
         )
 
-@view_config(route_name='generate')
+@view_config(route_name='generate', request_method='POST')
 def generate(context, request):
     filename = request.matchdict['filename_part']
-    code = unquote_plus(request.query_string.decode('utf-8'))
+    code = unquote_plus(request.text)
     code, callouts = extract_callouts(code)
     return generate_image(filename, code, callouts)
 
