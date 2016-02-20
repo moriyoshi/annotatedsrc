@@ -5,6 +5,7 @@ install_aliases()
 import io
 import re
 import os
+import unicodedata
 from urllib.parse import unquote_plus
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPFound
@@ -17,6 +18,11 @@ from pygments.lexers import get_lexer_for_filename
 from pygments.formatters.svg import SvgFormatter, escape_html
 from .git import Symbolic
 from .interfaces import IGitFetcher
+
+
+def eaw_len(ustr):
+    return sum(2 if unicodedata.east_asian_width(uc) in ('W', 'A') else 1 for uc in ustr)
+
 
 def extract_callouts(code):
     callouts = []
@@ -78,50 +84,67 @@ class CalloutRenderingSvgFormatter(SvgFormatter):
 
         For our implementation we put all lines in their own 'line group'.
         """
-        x = self.xoffset
-        y = self.yoffset
-        if not self.nowrap:
-            if self.encoding:
-                outfile.write('<?xml version="1.0" encoding="%s"?>\n' %
-                              self.encoding)
-            else:
-                outfile.write('<?xml version="1.0"?>\n')
-            outfile.write('<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" '
-                          '"http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/'
-                          'svg10.dtd">\n')
-            outfile.write('<svg xmlns="http://www.w3.org/2000/svg">\n')
-            outfile.write('<g font-family="%s" font-size="%s">\n' %
-                          (self.fontfamily, self.fontsize))
+        y = 0
+        max_line_length = 0 
+        buf = []
+        if self.xoffset != 0 or self.yoffset != 0:
+            buf.append(u'<g transform="translate(%d %d)">' % (self.xoffset, self.yoffset))
+        else:
+            buf.append(u'<g>')
         state = 0
+        line_length = 0
         for ttype, value in tokensource:
             style = self._get_style(ttype)
-            tspan = style and '<tspan' + style + '>' or ''
-            tspanend = tspan and '</tspan>' or ''
+            tspan = style and u'<tspan' + style + u'>' or u''
+            tspanend = tspan and u'</tspan>' or u''
             if isinstance(value, CalloutMarker):
                 callouts = value.callouts
             else:
                 callouts = []
-            value = escape_html(value)
             if self.spacehack:
-                value = value.expandtabs().replace(' ', '&#160;')
-            parts = value.split('\n')
+                value = value.expandtabs().replace(u' ', u'\u00a0')
+            parts = value.split(u'\n')
             for i, part in enumerate(parts):
                 if i > 0:
                     if callouts:
                         callout = callouts.pop(0)
-                        outfile.write(u'<tspan dx="2em" style="%(callout_style)s">−−−−−−− </tspan><tspan style="%(callout_style)s" text-anchor="middle">⬤</tspan><tspan dx="-1.75ex" text-anchor="middle" style="fill:#ffffff">%(callout)s</tspan>' % dict(callout=callout, callout_style=self.options['callout_style']))
+                        buf.append(u'<tspan dx="2em" style="%(callout_style)s">−−−−−−− </tspan><tspan style="%(callout_style)s">⬤</tspan><tspan dx="-1em" style="fill:#ffffff; font-weight: bold; font-size:0.8em">%(callout)s</tspan>' % dict(callout=callout, callout_style=self.options['callout_style']))
+                        line_length += 10
                     if state != 0:
-                        outfile.write('</text>')
+                        buf.append(u'</text>')
                     y += self.ystep
+                    max_line_length = max(max_line_length, line_length)
+                    line_length = 0
                     state = 0
                 if state == 0:
-                    outfile.write('<text x="%s" y="%s" xml:space="preserve">' % (x, y))
+                    buf.append(u'<text x="0" y="%s" xml:space="preserve">' % (y,))
                     state = 1
-                outfile.write(tspan + part + tspanend)
+                buf.append(tspan + escape_html(part) + tspanend)
+                line_length += eaw_len(part)
         if state != 0:
-            outfile.write('</text>')
+            buf.append(u'</text>')
+        max_line_length = max(max_line_length, line_length)
+        line_length = 0
+        buf.append(u'</g>')
         if not self.nowrap:
-            outfile.write('</g></svg>\n')
+            buf_prologue = []
+            buf_epilogue = []
+            if self.encoding:
+                buf_prologue.append(u'<?xml version="1.0" encoding="%s"?>\n' %
+                              self.encoding)
+            else:
+                buf_prologue.append(u'<?xml version="1.0"?>\n')
+            buf_prologue.append(u'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" '
+                       u'"http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/'
+                       u'svg10.dtd">\n')
+            width = self.xoffset + int(max_line_length * self.ystep * .8)
+            height = self.yoffset + y
+            buf_prologue.append(u'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:d} {height:d}" width="{width:d}" height="{height:d}" preserveAspectRatio="none">\n'.format(width=width, height=height))
+            buf_prologue.append(u'<g font-family="%s" font-size="%s">\n' %
+                                (self.fontfamily, self.fontsize))
+            buf_epilogue.append(u'</g></svg>\n')
+            buf = buf_prologue + buf + buf_epilogue
+        outfile.write(u''.join(buf))
 
 
 class PlainTextLexer(RegexLexer):
@@ -136,7 +159,7 @@ class PlainTextLexer(RegexLexer):
             ]
         }
 
-def generate_image(filename, code, callouts):
+def generate_image(filename, code, callouts, encoding='utf-8'):
     options = dict(
         stripnl=False,
         filters=[
@@ -151,11 +174,12 @@ def generate_image(filename, code, callouts):
         code,
         lexer=lexer,
         formatter=CalloutRenderingSvgFormatter(
-            callout_style='fill:#888;stroke:none'
+            callout_style='fill:#888;stroke:none',
+            encoding=encoding
             )
         )
     if isinstance(retval, str):
-        retval = unicode(retval)
+        retval = unicode(retval, encoding)
     return Response(
         status=200,
         content_type='image/svg+xml',
