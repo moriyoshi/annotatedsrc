@@ -2,6 +2,7 @@
 from future.standard_library import install_aliases
 install_aliases()
 
+import io
 import re
 import os
 from urllib.parse import unquote_plus
@@ -200,8 +201,9 @@ def fetch(context, request):
         raise HTTPNotFound()
     abs_path = os.path.join(r.working_dir, path)
     if not os.path.exists(abs_path):
-        raise HTTPNotFound() 
-    code_lines = [l.rstrip(u'\r\n \t') for l in open(abs_path)]
+        raise HTTPNotFound()
+    encoding = request.params.get('encoding')
+    code_lines = [l.rstrip(u'\r\n \t') for l in io.open(abs_path, encoding=(encoding or 'utf-8'))]
     range_ = request.params.get('range')
     if range_ is not None:
         start_line, end_line = range_.split(u'-', 2)
