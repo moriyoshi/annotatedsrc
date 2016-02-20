@@ -223,9 +223,9 @@ def fetch(context, request):
         raise HTTPNotFound()
     encoding = request.params.get('encoding')
     code_lines = [l.rstrip(u'\r\n \t') for l in io.open(abs_path, encoding=(encoding or 'utf-8'))]
-    range_ = request.params.get('range')
-    if range_ is not None:
-        start_line, end_line = range_.split(u'-', 2)
+    line_range = request.params.get('l')
+    if line_range is not None:
+        start_line, end_line = line_range.split(u'-', 2)
         try:
             if start_line == u'':
                 start_line = 0
