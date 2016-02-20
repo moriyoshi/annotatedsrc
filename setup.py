@@ -15,10 +15,10 @@ requires = [
     'gitpython',
     ]
 
-setup(name='embedsrc',
+setup(name='annotatedsrc',
       version='0.0',
       use_date_versioning=True,
-      description='embedsrc',
+      description='Renders syntax-highlighted and annotated source code',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
         "Programming Language :: Python",
@@ -38,10 +38,10 @@ setup(name='embedsrc',
       #setup_requires=[],
       #tests_require=tests_require,
       #extras_require=extras_require,
-      test_suite="embedsrc",
+      test_suite="annotatedsrc",
       entry_points="""\
       [paste.app_factory]
-      main = embedsrc:paster_main
+      main = annotatedsrc:paster_main
       """,
       paster_plugins=['pyramid'],
       )

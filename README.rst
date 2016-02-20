@@ -1,3 +1,7 @@
+============
+annotatedsrc
+============
+
 Rendering the posted source code with callouts
 ----------------------------------------------
 
@@ -20,6 +24,6 @@ Rendering the source code in the specified Git repository with callouts
 
 ::
 
-    GET http://localhost:8000/f/https://github.com/moriyoshi/embedsrc/master/+/setup.py?range=1-5&[A]=1&[B]=2
+    GET http://localhost:8000/f/https://github.com/moriyoshi/annotatedsrc/master/+/setup.py?range=1-5&[A]=1&[B]=2
 
 
