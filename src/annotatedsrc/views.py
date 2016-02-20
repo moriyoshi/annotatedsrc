@@ -11,6 +11,8 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPFound
 from pyramid.response import Response
 from pygments import highlight
 from pygments.filters import Filter
+from pygments import token
+from pygments.lexer import RegexLexer
 from pygments.lexers import get_lexer_for_filename
 from pygments.formatters.svg import SvgFormatter, escape_html
 from .git import Symbolic
@@ -120,15 +122,31 @@ class CalloutRenderingSvgFormatter(SvgFormatter):
             outfile.write('</text>')
         if not self.nowrap:
             outfile.write('</g></svg>\n')
-    
+
+
+class PlainTextLexer(RegexLexer):
+    name = 'Plain Text'
+    aliases = ['text']
+    filenames = ['*.txt']
+
+    tokens = {
+        'root': [
+            (r'\s+', token.Whitespace),
+            (r'\S+', token.Text),
+            ]
+        }
 
 def generate_image(filename, code, callouts):
-    lexer = get_lexer_for_filename(
-        filename,
+    options = dict(
+        stripnl=False,
         filters=[
             CalloutSpecifier(callouts=callouts),
             ]
         )
+    try:
+        lexer = get_lexer_for_filename(filename, **options)
+    except:
+        lexer = PlainTextLexer(**options)
     retval = highlight(
         code,
         lexer=lexer,
@@ -144,6 +162,7 @@ def generate_image(filename, code, callouts):
         charset='utf-8',
         text=retval
         )
+
 
 @view_config(route_name='generate', request_method='POST')
 def generate(context, request):
