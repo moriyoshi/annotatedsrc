@@ -13,6 +13,8 @@ requires = [
     'gunicorn',
     'future',
     'gitpython',
+    'pyramid_dogpile_cache',
+    'dogpile.cache',
     ]
 
 setup(name='annotatedsrc',

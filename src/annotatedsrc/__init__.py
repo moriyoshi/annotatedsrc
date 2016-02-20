@@ -5,6 +5,7 @@ def paster_main(global_config, **local_config):
     settings.update(local_config)
 
     config = Configurator(settings=settings) 
+    config.include('pyramid_dogpile_cache')
     config.add_route('generate', '/g/{filename_part}.svg')
     config.add_route('fetch', '/f/*repo_url_and_path')
     config.scan('.')
